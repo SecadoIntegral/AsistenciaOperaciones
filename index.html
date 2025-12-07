@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Asistencia de operaciones</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 16px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px 16px 12px;
+            text-align: center;
+            border-bottom-left-radius: 20px;
+            border-bottom-right-radius: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            width: 100%;
+        }
+
+        .header h1 {
+            font-size: 22px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .header p {
+            font-size: 14px;
+            color: #666;
+        }
+
+        /* Contenedor de tarjetas con scroll horizontal */
+        .cards-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            margin-top: 16px;
+        }
+
+        .cards-container {
+            display: flex;
+            flex-direction: row;
+            gap: 12px;
+        }
+
+        .card {
+            min-width: 250px;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 16px;
+            padding: 18px;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(10px);
+            flex-shrink: 0;
+            height: auto; /* altura según contenido */
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+        }
+
+        .card-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .card-row:last-child {
+            border-bottom: none;
+        }
+
+        .field-label {
+            font-size: 13px;
+            color: #888;
+            font-weight: 500;
+            min-width: 100px;
+        }
+
+        .field-value {
+            font-size: 15px;
+            color: #333;
+            font-weight: 500;
+            text-align: right;
+            flex: 1;
+            padding-left: 10px;
+        }
+
+        .field-value.fecha { color: #667eea; }
+        .field-value.nombre { color: #333; }
+        .field-value.cantidad { color: #764ba2; font-weight: 600; }
+        .field-value.cumplimiento { color: #4CAF50; font-weight: 700; font-size: 16px; }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: white;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+        }
+
+        .empty-state i { font-size: 40px; margin-bottom: 10px; opacity: 0.8; }
+
+        .loading {
+            text-align: center;
+            padding: 40px 20px;
+            color: white;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top: 3px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Ocultar scrollbar */
+        .cards-wrapper::-webkit-scrollbar { display: none; }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1><i class="fas fa-clipboard-check"></i> Asistencia de operaciones</h1>
+        <p>Registro de actividades operativas</p>
+    </div>
+
+    <div class="cards-wrapper">
+        <div class="cards-container" id="cardsContainer">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Cargando datos...</p>
+            </div>
+        </div>
+    </div>
+
+<script>
+const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT5i-0cmBx7qsfQUMYxhYq0IthnXW3JOiJT6BU-7Rx7PKslVM6vDgqEdCxZEalkeEPH5WILeZe9mkjc/pub?gid=2101037219&single=true&output=csv';
+
+let allData = [];
+
+function parseCSV(text) {
+    const rows = [];
+    let current = '', row = [], inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        if (char === '"' && text[i - 1] !== '\\') inQuotes = !inQuotes;
+        else if (char === ',' && !inQuotes) { row.push(current.trim().replace(/^"|"$/g, '')); current = ''; }
+        else if ((char === '\n' || char === '\r') && !inQuotes) {
+            if (current || row.length) { row.push(current.trim().replace(/^"|"$/g, '')); rows.push(row); row = []; current = ''; }
+        } else current += char;
+    }
+    if (current || row.length) { row.push(current.trim().replace(/^"|"$/g, '')); rows.push(row); }
+    return rows.filter(r => r.length > 1);
+}
+
+async function loadCSVData() {
+    try {
+        const response = await fetch(csvUrl);
+        const csvText = await response.text();
+        const rows = parseCSV(csvText);
+        if (rows.length < 2) return [];
+
+        const headers = rows[0].map(h => h.trim().toLowerCase());
+        const data = [];
+
+        const fechaIndex = headers.findIndex(h => h.includes('fecha') || h.includes('date'));
+        const nombreIndex = headers.findIndex(h => h.includes('nombre') || h.includes('name'));
+        const cantidadIndex = headers.findIndex(h => h.includes('cantidad') || h.includes('cant'));
+        const cumplimientoIndex = headers.findIndex(h => h.includes('cumplimiento') || h.includes('cumpl') || h.includes('estado') || h.includes('status'));
+
+        for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            const item = {
+                Fecha: fechaIndex >= 0 && fechaIndex < row.length ? row[fechaIndex] : row[0],
+                Nombre: nombreIndex >= 0 && nombreIndex < row.length ? row[nombreIndex] : row[1],
+                Cantidad: cantidadIndex >= 0 && cantidadIndex < row.length ? row[cantidadIndex] : '',
+                Cumplimiento: cumplimientoIndex >= 0 && cumplimientoIndex < row.length ? row[cumplimientoIndex] : ''
+            };
+            if (Object.values(item).some(val => val && val !== '')) data.push(item);
+        }
+        return data;
+    } catch (error) { console.error('Error cargando CSV:', error); return []; }
+}
+
+function createCards(data) {
+    const container = document.getElementById('cardsContainer');
+    if (!data.length) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-database"></i>
+                <p>No hay datos disponibles</p>
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = '';
+    data.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+            <div class="card-row">
+                <span class="field-label">Fecha</span>
+                <span class="field-value fecha">${item.Fecha || 'N/A'}</span>
+            </div>
+            <div class="card-row">
+                <span class="field-label">Nombre</span>
+                <span class="field-value nombre">${item.Nombre || 'N/A'}</span>
+            </div>
+            <div class="card-row">
+                <span class="field-label">Cantidad</span>
+                <span class="field-value cantidad">${item.Cantidad || 'N/A'}</span>
+            </div>
+            <div class="card-row">
+                <span class="field-label">Cumplimiento</span>
+                <span class="field-value cumplimiento">${item.Cumplimiento || 'N/A'}</span>
+            </div>`;
+        container.appendChild(card);
+    });
+}
+
+async function initApp() {
+    allData = await loadCSVData();
+
+    // Ordenar de mayor a menor según Cantidad
+    allData.sort((a, b) => {
+        const cantidadA = parseFloat(a.Cantidad) || 0;
+        const cantidadB = parseFloat(b.Cantidad) || 0;
+        return cantidadB - cantidadA; // mayor primero
+    });
+
+    createCards(allData);
+}
+
+
+document.addEventListener('DOMContentLoaded', initApp);
+</script>
+
+</body>
+</html>

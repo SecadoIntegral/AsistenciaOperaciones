@@ -44,18 +44,20 @@
             color: #666;
         }
 
-        /* Contenedor de tarjetas con scroll horizontal */
+        /* Contenedor de tarjetas con scroll vertical */
         .cards-wrapper {
             width: 100%;
-            overflow-x: auto;
-            overflow-y: hidden;
+            max-height: 80vh; /* Altura máxima para que el contenedor sea scrollable */
+            overflow-y: auto;
+            overflow-x: hidden;
             -webkit-overflow-scrolling: touch;
             margin-top: 16px;
+            padding-bottom: 50px; /* Espacio adicional al final para permitir scroll extra */
         }
 
         .cards-container {
             display: flex;
-            flex-direction: row;
+            flex-direction: column; /* Cambiado de row a column para apilar las tarjetas */
             gap: 12px;
         }
 
@@ -216,7 +218,7 @@ async function loadCSVData() {
 function createCards(data) {
     const container = document.getElementById('cardsContainer');
     if (!data.length) {
-        container.innerHTML = `
+        container.innerHTML = ` 
             <div class="empty-state">
                 <i class="fas fa-database"></i>
                 <p>No hay datos disponibles</p>
@@ -228,7 +230,7 @@ function createCards(data) {
     data.forEach(item => {
         const card = document.createElement('div');
         card.className = 'card';
-        card.innerHTML = `
+        card.innerHTML = ` 
             <div class="card-row">
                 <span class="field-label">Fecha</span>
                 <span class="field-value fecha">${item.Fecha || 'N/A'}</span>
@@ -261,7 +263,6 @@ async function initApp() {
 
     createCards(allData);
 }
-
 
 document.addEventListener('DOMContentLoaded', initApp);
 </script>
